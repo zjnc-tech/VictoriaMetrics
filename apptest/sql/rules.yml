@@ -1,0 +1,23 @@
+# rules.yaml
+groups:
+  # 应用监控告警组
+  - name: application_alerts
+    type: sql
+    interval: 30s
+    rules:
+      # HTTP 错误率告警
+      - alert: HighHTTPErrorRate
+        expr: "sum(rate(http_requests_total{status=~'5..'}[5m])) / sum(rate(http_requests_total[5m])) * 100 > 5"
+        for: 2m
+        labels:
+          severity: critical
+          team: app
+        annotations:
+          summary: "高 HTTP 错误率"
+          description: "HTTP 5xx 错误率超过 5% 已持续 2 分钟"
+
+      # 记录规则：请求率统计
+      - record: api:request:rate
+        expr: "rate(http_requests_total[5m])"
+        labels:
+          type: "rate"

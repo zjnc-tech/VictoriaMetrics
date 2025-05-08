@@ -35,6 +35,12 @@ func NewVLogsType() Type {
 	}
 }
 
+func NewSqlType() Type {
+	return Type{
+		Name: "sql",
+	}
+}
+
 // NewRawType returns datasource type from raw string
 // without validation.
 func NewRawType(d string) Type {
@@ -83,6 +89,9 @@ func (t *Type) ValidateExpr(expr string) error {
 				return fmt.Errorf("bad LogsQL expr: %q, err: cannot contain time buckets stats pipe `stats by (_time:step)`", expr)
 			}
 		}
+	case "sql":
+		// 实现数据源的表达式验证
+		return nil
 	default:
 		return fmt.Errorf("unknown datasource type=%q", t.Name)
 	}
@@ -96,7 +105,7 @@ func (t *Type) UnmarshalYAML(unmarshal func(any) error) error {
 		return err
 	}
 	switch s {
-	case "graphite", "prometheus", "vlogs":
+	case "graphite", "prometheus", "vlogs", "sql":
 	default:
 		return fmt.Errorf("unknown datasource type=%q, want prometheus, graphite or vlogs", s)
 	}
