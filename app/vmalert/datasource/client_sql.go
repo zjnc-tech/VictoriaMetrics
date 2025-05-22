@@ -7,9 +7,12 @@ import (
 	"time"
 )
 
-type sqlResponse []sqlResponseTarget
+type sqlResponse struct {
+	Error string        `json:"error"`
+	Data  []sqlDataItem `json:"data"`
+}
 
-type sqlResponseTarget struct {
+type sqlDataItem struct {
 	Labels     map[string]string `json:"labels"`
 	DataPoints []struct {
 		Timestamp int64   `json:"timestamp"`
@@ -19,7 +22,7 @@ type sqlResponseTarget struct {
 
 func (r sqlResponse) metrics() []Metric {
 	var ms []Metric
-	for _, res := range r {
+	for _, res := range r.Data {
 		if len(res.DataPoints) < 1 {
 			continue
 		}

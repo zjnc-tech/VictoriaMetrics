@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,21 +13,6 @@ import (
 	"github.com/golang/snappy"
 	"github.com/prometheus/prometheus/prompb"
 )
-
-// DataPoint 定义数据点结构
-type DataPoint struct {
-	Timestamp int64   `json:"timestamp"`
-	Value     float64 `json:"value"`
-}
-
-// SQLResponseTarget 定义单个目标的响应结构
-type SQLResponseTarget struct {
-	Labels     map[string]string `json:"labels"`
-	DataPoints []DataPoint       `json:"datapoints"`
-}
-
-// SQLResponse 定义完整的响应结构
-type SQLResponse []SQLResponseTarget
 
 // 记录器接口
 type Logger interface {
@@ -43,6 +29,18 @@ func (l *DefaultLogger) LogRequest(r *http.Request, start time.Time) {
 	fmt.Printf("请求方法: %s\n", r.Method)
 	fmt.Println("查询参数:", r.URL.Query())
 	fmt.Println("请求头:", r.Header)
+
+	// 读取并打印请求体数据
+	if r.Body != nil {
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			fmt.Println("读取请求体失败:", err)
+		} else {
+			fmt.Println("请求体:", string(bodyBytes))
+			// 重新设置请求体,因为ReadAll会消耗掉body
+			r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+		}
+	}
 }
 
 func (l *DefaultLogger) LogPrometheusWrite(r *http.Request, ts []prompb.TimeSeries) {
@@ -79,50 +77,6 @@ func NewServer(addr string) *Server {
 	return &Server{
 		logger: &DefaultLogger{},
 		addr:   addr,
-	}
-}
-
-// 中间件：记录请求信息
-func (s *Server) loggingMiddleware(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-		s.logger.LogRequest(r, start)
-		next.ServeHTTP(w, r)
-		fmt.Printf("处理耗时: %v\n", time.Since(start))
-	}
-}
-
-// 生成单个数据点的示例数据
-func generateSingleDataPoint() SQLResponse {
-	now := time.Now().Unix()
-	return SQLResponse{
-		{
-			Labels: map[string]string{
-				"instance": "localhost:5001",
-				"job":      "sql",
-			},
-			DataPoints: []DataPoint{
-				{Timestamp: now, Value: 42.5},
-			},
-		},
-	}
-}
-
-// 生成多个数据点的示例数据
-func generateMultipleDataPoints() SQLResponse {
-	now := time.Now().Unix()
-	return SQLResponse{
-		{
-			Labels: map[string]string{
-				"instance": "localhost:5001",
-				"job":      "sql",
-			},
-			DataPoints: []DataPoint{
-				{Timestamp: now - 60, Value: 42.5},
-				{Timestamp: now - 30, Value: 43.2},
-				{Timestamp: now, Value: 44.1},
-			},
-		},
 	}
 }
 
@@ -171,20 +125,7 @@ func (s *Server) handlePrometheusWrite(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	server := NewServer(":5001")
-
-	// 注册路由处理器
-	http.HandleFunc("/sql/api/v1/query", server.loggingMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		sendJSONResponse(w, generateSingleDataPoint())
-	}))
-
-	http.HandleFunc("/sql/api/v1/query_range", server.loggingMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		sendJSONResponse(w, generateMultipleDataPoints())
-	}))
-
-	http.HandleFunc("/alert/api/v1/webhook", server.loggingMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		sendJSONResponse(w, map[string]string{"message": "请求已接收"})
-	}))
+	server := NewServer(":5002")
 
 	http.HandleFunc("/vector/api/v1/write", server.handlePrometheusWrite)
 

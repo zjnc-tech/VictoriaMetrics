@@ -7,7 +7,13 @@ groups:
     rules:
       # HTTP 错误率告警
       - alert: HighHTTPErrorRate
-        expr: "sum(rate(http_requests_total{status=~'5..'}[5m])) / sum(rate(http_requests_total[5m])) * 100 > 5"
+        expr: "SELECT 
+    l.service,
+    l.level,
+    m.metric_value
+FROM logs l
+JOIN metrics m ON l.service = m.service
+WHERE l.timestamp >= now() - INTERVAL 1 HOUR | value=xx | time=zz | labels(labela=a,labelb=b) | value > 10 | time:nnn"
         for: 2m
         labels:
           severity: critical
