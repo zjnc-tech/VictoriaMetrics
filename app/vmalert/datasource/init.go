@@ -58,6 +58,11 @@ var (
 		`Only valid for VictoriaMetrics as the datasource.`)
 )
 
+var (
+	Addr             = addr
+	AppendTypePrefix = appendTypePrefix
+)
+
 // InitSecretFlags must be called after flag.Parse and before any logging
 func InitSecretFlags() {
 	if !*showDatasourceURL {

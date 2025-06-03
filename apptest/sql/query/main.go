@@ -16,11 +16,11 @@ type sqlResponse struct {
 }
 
 type sqlDataItem struct {
-	Labels     map[string]string `json:"labels"`
-	DataPoints []struct {
+	Labels map[string]string `json:"labels"`
+	Points []struct {
 		Timestamp int64   `json:"timestamp"`
 		Value     float64 `json:"value"`
-	} `json:"datapoints"`
+	} `json:"points"`
 }
 
 type Logger interface {
@@ -79,7 +79,7 @@ func generateSingleDataPoint() sqlResponse {
 					"instance": "localhost:5001",
 					"job":      "sql",
 				},
-				DataPoints: []struct {
+				Points: []struct {
 					Timestamp int64   `json:"timestamp"`
 					Value     float64 `json:"value"`
 				}{
@@ -100,7 +100,7 @@ func generateMultipleDataPoints() sqlResponse {
 					"instance": "localhost:5001",
 					"job":      "sql",
 				},
-				DataPoints: []struct {
+				Points: []struct {
 					Timestamp int64   `json:"timestamp"`
 					Value     float64 `json:"value"`
 				}{

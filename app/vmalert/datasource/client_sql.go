@@ -8,26 +8,26 @@ import (
 )
 
 type sqlResponse struct {
-	Error string        `json:"error"`
-	Data  []sqlDataItem `json:"data"`
+	Message string        `json:"message"`
+	Data    []sqlDataItem `json:"data"`
 }
 
 type sqlDataItem struct {
-	Labels     map[string]string `json:"labels"`
-	DataPoints []struct {
+	Labels map[string]string `json:"labels"`
+	Points []struct {
 		Timestamp int64   `json:"timestamp"`
 		Value     float64 `json:"value"`
-	} `json:"datapoints"`
+	} `json:"points"`
 }
 
 func (r sqlResponse) metrics() []Metric {
 	var ms []Metric
 	for _, res := range r.Data {
-		if len(res.DataPoints) < 1 {
+		if len(res.Points) < 1 {
 			continue
 		}
 		var m Metric
-		for _, dp := range res.DataPoints {
+		for _, dp := range res.Points {
 			m.Values = append(m.Values, dp.Value)
 			m.Timestamps = append(m.Timestamps, dp.Timestamp)
 		}
@@ -48,21 +48,15 @@ func parseSqlResponse(req *http.Request, resp *http.Response) (Result, error) {
 }
 
 func (c *Client) setSqlReqParams(r *http.Request, query string, timestamp time.Time) {
-	// 如果启用了类型前缀,添加/sql到路径
 	if c.appendTypePrefix {
 		r.URL.Path += "/sql"
 	}
-	// 如果未禁用路径追加,添加/api/v1/query到路径
 	if !*disablePathAppend {
-		r.URL.Path += "/api/v1/query"
+		r.URL.Path += "/api/v1/sql_query"
 	}
-	// 获取URL查询参数
 	q := r.URL.Query()
-	// 设置查询时间戳
 	q.Set("time", timestamp.Format(time.RFC3339))
-	// 编码URL查询参数
 	r.URL.RawQuery = q.Encode()
-	// 设置请求参数
 	c.setReqParams(r, query)
 }
 
@@ -71,7 +65,7 @@ func (c *Client) setSqlRangeReqParams(r *http.Request, query string, start, end 
 		r.URL.Path += "/sql"
 	}
 	if !*disablePathAppend {
-		r.URL.Path += "/api/v1/query_range"
+		r.URL.Path += "/api/v1/sql_query_range"
 	}
 	q := r.URL.Query()
 	q.Add("start", start.Format(time.RFC3339))
