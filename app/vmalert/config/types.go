@@ -1,9 +1,12 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 
+	"github.com/VictoriaMetrics/VictoriaMetrics/app/vmalert/datasource"
 	"github.com/VictoriaMetrics/VictoriaMetrics/app/vmselect/graphiteql"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/logstorage"
 	"github.com/VictoriaMetrics/metricsql"
@@ -32,6 +35,12 @@ func NewGraphiteType() Type {
 func NewVLogsType() Type {
 	return Type{
 		Name: "vlogs",
+	}
+}
+
+func NewSqlType() Type {
+	return Type{
+		Name: "sql",
 	}
 }
 
@@ -83,6 +92,34 @@ func (t *Type) ValidateExpr(expr string) error {
 				return fmt.Errorf("bad LogsQL expr: %q, err: cannot contain time buckets stats pipe `stats by (_time:step)`", expr)
 			}
 		}
+	case "sql":
+		r, err := http.NewRequest(http.MethodPost, *datasource.Addr, nil)
+		if *datasource.AppendTypePrefix {
+			r.URL.Path += "/sql"
+		}
+		if !*datasource.DisablePathAppend {
+			r.URL.Path += "/api/v1/sql_validate"
+		}
+		if err != nil {
+			return fmt.Errorf("bad sql http request: %q, err: %w", expr, err)
+		}
+		params := r.URL.Query()
+		params.Set("query", expr)
+		r.URL.RawQuery = params.Encode()
+		resp, err := http.DefaultClient.Do(r)
+		if err != nil {
+			return fmt.Errorf("bad sql http client: %q, err: %w", expr, err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			r := &struct {
+				Message string `json:"message"`
+			}{}
+			if err := json.NewDecoder(resp.Body).Decode(r); err != nil {
+				return fmt.Errorf("error parsing sql validate response: %w", err)
+			}
+			return fmt.Errorf("bad sql expr: %q, err: %s", expr, r.Message)
+		}
 	default:
 		return fmt.Errorf("unknown datasource type=%q", t.Name)
 	}
@@ -96,7 +133,7 @@ func (t *Type) UnmarshalYAML(unmarshal func(any) error) error {
 		return err
 	}
 	switch s {
-	case "graphite", "prometheus", "vlogs":
+	case "graphite", "prometheus", "vlogs", "sql":
 	default:
 		return fmt.Errorf("unknown datasource type=%q, want prometheus, graphite or vlogs", s)
 	}

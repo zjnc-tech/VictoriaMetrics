@@ -21,6 +21,7 @@ const (
 	datasourcePrometheus datasourceType = "prometheus"
 	datasourceGraphite   datasourceType = "graphite"
 	datasourceVLogs      datasourceType = "vlogs"
+	datasourceSql        datasourceType = "sql"
 )
 
 func toDatasourceType(s string) datasourceType {
@@ -31,6 +32,8 @@ func toDatasourceType(s string) datasourceType {
 		return datasourceGraphite
 	case string(datasourceVLogs):
 		return datasourceVLogs
+	case string(datasourceSql):
+		return datasourceSql
 	default:
 		logger.Panicf("BUG: unknown datasource type %q", s)
 	}
@@ -183,6 +186,8 @@ func (c *Client) Query(ctx context.Context, query string, ts time.Time) (Result,
 		parseFn = parseGraphiteResponse
 	case datasourceVLogs:
 		parseFn = parseVLogsResponse
+	case datasourceSql:
+		parseFn = parseSqlResponse
 	default:
 		logger.Panicf("BUG: unsupported datasource type %q to parse query response", c.dataSourceType)
 	}
@@ -237,6 +242,8 @@ func (c *Client) QueryRange(ctx context.Context, query string, start, end time.T
 		parseFn = parsePrometheusResponse
 	case datasourceVLogs:
 		parseFn = parseVLogsResponse
+	case datasourceSql:
+		parseFn = parseSqlResponse
 	default:
 		logger.Panicf("BUG: unsupported datasource type %q to parse query range response", c.dataSourceType)
 	}
@@ -275,6 +282,8 @@ func (c *Client) newQueryRangeRequest(ctx context.Context, query string, start, 
 		c.setPrometheusRangeReqParams(req, query, start, end)
 	case datasourceVLogs:
 		c.setVLogsRangeReqParams(req, query, start, end)
+	case datasourceSql:
+		c.setSqlRangeReqParams(req, query, start, end)
 	default:
 		logger.Panicf("BUG: unsupported datasource type %q to create range query request", c.dataSourceType)
 	}
@@ -293,6 +302,8 @@ func (c *Client) newQueryRequest(ctx context.Context, query string, ts time.Time
 		c.setGraphiteReqParams(req, query)
 	case datasourceVLogs:
 		c.setVLogsInstantReqParams(req, query, ts)
+	case datasourceSql:
+		c.setSqlReqParams(req, query, ts)
 	default:
 		logger.Panicf("BUG: unsupported datasource type %q to create query request", c.dataSourceType)
 	}
