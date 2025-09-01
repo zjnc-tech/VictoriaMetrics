@@ -8,8 +8,7 @@ import (
 )
 
 type sqlResponse struct {
-	Message string        `json:"message"`
-	Data    []sqlDataItem `json:"data"`
+	Data []sqlDataItem `json:"data"`
 }
 
 type sqlDataItem struct {

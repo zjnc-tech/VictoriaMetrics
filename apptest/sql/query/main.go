@@ -11,8 +11,7 @@ import (
 )
 
 type sqlResponse struct {
-	Error string        `json:"error"`
-	Data  []sqlDataItem `json:"data"`
+	Data []sqlDataItem `json:"data"`
 }
 
 type sqlDataItem struct {
@@ -72,7 +71,6 @@ func (s *Server) loggingMiddleware(next http.HandlerFunc) http.HandlerFunc {
 func generateSingleDataPoint() sqlResponse {
 	now := time.Now().Unix()
 	return sqlResponse{
-		Error: "",
 		Data: []sqlDataItem{
 			{
 				Labels: map[string]string{
@@ -93,7 +91,6 @@ func generateSingleDataPoint() sqlResponse {
 func generateMultipleDataPoints() sqlResponse {
 	now := time.Now().Unix()
 	return sqlResponse{
-		Error: "",
 		Data: []sqlDataItem{
 			{
 				Labels: map[string]string{
@@ -127,11 +124,11 @@ func main() {
 		sendJSONResponse(w, map[string]string{"message": "请求已接收"})
 	}))
 
-	http.HandleFunc("/sql/api/v1/query", server.loggingMiddleware(func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/api/v1/sql_query", server.loggingMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		sendJSONResponse(w, generateSingleDataPoint())
 	}))
 
-	http.HandleFunc("/sql/api/v1/query_range", server.loggingMiddleware(func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/api/v1/sql_query_range", server.loggingMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		sendJSONResponse(w, generateMultipleDataPoints())
 	}))
 
