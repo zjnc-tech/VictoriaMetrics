@@ -1,10 +1,12 @@
 package datasource
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"strings"
@@ -22,6 +24,7 @@ const (
 	datasourceGraphite   datasourceType = "graphite"
 	datasourceVLogs      datasourceType = "vlogs"
 	datasourceSql        datasourceType = "sql"
+	datasourceNhiLog     datasourceType = "nhi_log"
 )
 
 func toDatasourceType(s string) datasourceType {
@@ -34,6 +37,8 @@ func toDatasourceType(s string) datasourceType {
 		return datasourceVLogs
 	case string(datasourceSql):
 		return datasourceSql
+	case string(datasourceNhiLog):
+		return datasourceNhiLog
 	default:
 		logger.Panicf("BUG: unknown datasource type %q", s)
 	}
@@ -47,6 +52,7 @@ type Client struct {
 	c                *http.Client
 	authCfg          *promauth.Config
 	datasourceURL    string
+	nhiLogURL        string
 	appendTypePrefix bool
 	queryStep        time.Duration
 	dataSourceType   datasourceType
@@ -79,6 +85,7 @@ func (c *Client) Clone() *Client {
 		c:                c.c,
 		authCfg:          c.authCfg,
 		datasourceURL:    c.datasourceURL,
+		nhiLogURL:        c.nhiLogURL,
 		appendTypePrefix: c.appendTypePrefix,
 		queryStep:        c.queryStep,
 
@@ -188,6 +195,8 @@ func (c *Client) Query(ctx context.Context, query string, ts time.Time) (Result,
 		parseFn = parseVLogsResponse
 	case datasourceSql:
 		parseFn = parseSqlResponse
+	case datasourceNhiLog:
+		parseFn = parseNhiLogResponse
 	default:
 		logger.Panicf("BUG: unsupported datasource type %q to parse query response", c.dataSourceType)
 	}
@@ -244,6 +253,8 @@ func (c *Client) QueryRange(ctx context.Context, query string, start, end time.T
 		parseFn = parseVLogsResponse
 	case datasourceSql:
 		parseFn = parseSqlResponse
+	case datasourceNhiLog:
+		parseFn = parseNhiLogResponse
 	default:
 		logger.Panicf("BUG: unsupported datasource type %q to parse query range response", c.dataSourceType)
 	}
@@ -284,6 +295,10 @@ func (c *Client) newQueryRangeRequest(ctx context.Context, query string, start, 
 		c.setVLogsRangeReqParams(req, query, start, end)
 	case datasourceSql:
 		c.setSqlRangeReqParams(req, query, start, end)
+	case datasourceNhiLog:
+		if err := c.setNhiLogRangeReqParams(req, query, start, end); err != nil {
+			return nil, fmt.Errorf("cannot set nhi_log range request params: %w", err)
+		}
 	default:
 		logger.Panicf("BUG: unsupported datasource type %q to create range query request", c.dataSourceType)
 	}
@@ -304,6 +319,10 @@ func (c *Client) newQueryRequest(ctx context.Context, query string, ts time.Time
 		c.setVLogsInstantReqParams(req, query, ts)
 	case datasourceSql:
 		c.setSqlReqParams(req, query, ts)
+	case datasourceNhiLog:
+		if err := c.setNhiLogReqParams(req, query, ts); err != nil {
+			return nil, fmt.Errorf("cannot set nhi_log request params: %w", err)
+		}
 	default:
 		logger.Panicf("BUG: unsupported datasource type %q to create query request", c.dataSourceType)
 	}
@@ -314,6 +333,12 @@ func (c *Client) newRequest(ctx context.Context) (*http.Request, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.datasourceURL, nil)
 	if err != nil {
 		logger.Panicf("BUG: unexpected error from http.NewRequest(%q): %s", c.datasourceURL, err)
+	}
+	if c.dataSourceType == datasourceNhiLog {
+		req, err = http.NewRequestWithContext(ctx, http.MethodPost, c.nhiLogURL, nil)
+		if err != nil {
+			logger.Panicf("BUG: unexpected error from http.NewRequest(%q): %s", c.nhiLogURL, err)
+		}
 	}
 	req.Header.Set("Content-Type", "application/json")
 	if c.authCfg != nil {
@@ -341,4 +366,30 @@ func (c *Client) setReqParams(r *http.Request, query string) {
 	}
 	q.Set("query", query)
 	r.URL.RawQuery = q.Encode()
+}
+
+// setFormDataParams sets query as form-data in request body.
+func (c *Client) setFormDataParams(r *http.Request, query string) error {
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+
+	fieldWriter, err := writer.CreateFormField("query")
+	if err != nil {
+		return fmt.Errorf("failed to create form field: %w", err)
+	}
+	_, err = fieldWriter.Write([]byte(query))
+	if err != nil {
+		return fmt.Errorf("failed to write query to form: %w", err)
+	}
+
+	err = writer.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close multipart writer: %w", err)
+	}
+
+	r.Body = io.NopCloser(&body)
+	r.ContentLength = int64(body.Len())
+	r.Header.Set("Content-Type", writer.FormDataContentType())
+
+	return nil
 }

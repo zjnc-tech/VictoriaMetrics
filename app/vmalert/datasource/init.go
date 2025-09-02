@@ -56,11 +56,15 @@ var (
 		`If true, disables HTTP keep-alive and will only use the connection to the server for a single HTTP request.`)
 	roundDigits = flag.Int("datasource.roundDigits", 0, `Adds "round_digits" GET param to datasource requests which limits the number of digits after the decimal point in response values. `+
 		`Only valid for VictoriaMetrics as the datasource.`)
+
+	nhiLogAddr = flag.String("datasource.nhiLogUrl", "", "Datasource compatible with Prometheus HTTP API. "+
+		"Supports address in the form of IP address with a port (e.g., http://127.0.0.1:8428) or DNS SRV record. ")
 )
 
 var (
 	Addr             = addr
 	AppendTypePrefix = appendTypePrefix
+	NhiLogAddr       = nhiLogAddr
 )
 
 // InitSecretFlags must be called after flag.Parse and before any logging
@@ -86,6 +90,9 @@ type Param struct {
 func Init(extraParams url.Values) (QuerierBuilder, error) {
 	if err := httputil.CheckURL(*addr); err != nil {
 		return nil, fmt.Errorf("invalid -datasource.url: %w", err)
+	}
+	if err := httputil.CheckURL(*nhiLogAddr); err != nil {
+		return nil, fmt.Errorf("invalid -datasource.nhiLogUrl: %w", err)
 	}
 	tr, err := promauth.NewTLSTransport(*tlsCertFile, *tlsKeyFile, *tlsCAFile, *tlsServerName, *tlsInsecureSkipVerify, "vmalert_datasource")
 	if err != nil {
@@ -126,6 +133,7 @@ func Init(extraParams url.Values) (QuerierBuilder, error) {
 		c:                &http.Client{Transport: tr},
 		authCfg:          authCfg,
 		datasourceURL:    strings.TrimSuffix(*addr, "/"),
+		nhiLogURL:        strings.TrimSuffix(*nhiLogAddr, "/"),
 		appendTypePrefix: *appendTypePrefix,
 		queryStep:        *queryStep,
 		extraParams:      extraParams,

@@ -1,8 +1,10 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"mime/multipart"
 	"net/http"
 	"strings"
 
@@ -41,6 +43,12 @@ func NewVLogsType() Type {
 func NewSqlType() Type {
 	return Type{
 		Name: "sql",
+	}
+}
+
+func NewNhiLogType() Type {
+	return Type{
+		Name: "nhi_log",
 	}
 }
 
@@ -120,6 +128,49 @@ func (t *Type) ValidateExpr(expr string) error {
 			}
 			return fmt.Errorf("bad sql expr: %q, err: %s", expr, r.Message)
 		}
+	case "nhi_log":
+		var body bytes.Buffer
+		writer := multipart.NewWriter(&body)
+		fieldWriter, err := writer.CreateFormField("query")
+		if err != nil {
+			return fmt.Errorf("failed to create form field: %w", err)
+		}
+		_, err = fieldWriter.Write([]byte(expr))
+		if err != nil {
+			return fmt.Errorf("failed to write query to form: %w", err)
+		}
+		err = writer.Close()
+		if err != nil {
+			return fmt.Errorf("failed to close multipart writer: %w", err)
+		}
+
+		r, err := http.NewRequest(http.MethodPost, *datasource.NhiLogAddr, &body)
+		if err != nil {
+			return fmt.Errorf("bad nhi_log http request: %q, err: %w", expr, err)
+		}
+		if !*datasource.DisablePathAppend {
+			r.URL.Path += "/backends/api/v1/log/alert_query_verify"
+		}
+		r.Header.Set("Content-Type", writer.FormDataContentType())
+		resp, err := http.DefaultClient.Do(r)
+		if err != nil {
+			return fmt.Errorf("bad nhi_log http client: %q, err: %w", expr, err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode == http.StatusOK {
+			r := &struct {
+				Valid        bool   `json:"valid"`
+				ErrorMessage string `json:"errorMessage"`
+			}{}
+			if err := json.NewDecoder(resp.Body).Decode(r); err != nil {
+				return fmt.Errorf("error parsing nhi_log validate response: %w", err)
+			}
+			if !r.Valid {
+				return fmt.Errorf("bad nhi_log expr: %q, err: %s", expr, r.ErrorMessage)
+			}
+		} else {
+			return fmt.Errorf("bad nhi_log expr: %q", expr)
+		}
 	default:
 		return fmt.Errorf("unknown datasource type=%q", t.Name)
 	}
@@ -133,7 +184,7 @@ func (t *Type) UnmarshalYAML(unmarshal func(any) error) error {
 		return err
 	}
 	switch s {
-	case "graphite", "prometheus", "vlogs", "sql":
+	case "graphite", "prometheus", "vlogs", "sql", "nhi_log":
 	default:
 		return fmt.Errorf("unknown datasource type=%q, want prometheus, graphite or vlogs", s)
 	}
