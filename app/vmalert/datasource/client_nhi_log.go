@@ -28,10 +28,11 @@ func (c *Client) setNhiLogReqParams(r *http.Request, query string, timestamp tim
 		r.URL.Path += "/backends/api/v1/log/stats_query"
 	}
 	q := r.URL.Query()
-	q.Set("time", timestamp.Format(time.RFC3339))
 	if c.applyIntervalAsTimeFilter && c.evaluationInterval > 0 {
-		q.Set("startTime", timestamp.Add(-c.evaluationInterval).Format(time.RFC3339))
-		q.Set("endTime", timestamp.Format(time.RFC3339))
+		q.Set("StartTime", timestamp.Add(-c.evaluationInterval).Format(time.DateTime))
+		q.Set("EndTime", timestamp.Format(time.DateTime))
+	} else {
+		q.Set("Time", timestamp.Format(time.DateTime))
 	}
 	r.URL.RawQuery = q.Encode()
 	return c.setFormDataParams(r, query)
@@ -42,8 +43,8 @@ func (c *Client) setNhiLogRangeReqParams(r *http.Request, query string, start, e
 		r.URL.Path += "/backends/api/v1/log/stats_query_range"
 	}
 	q := r.URL.Query()
-	q.Add("startTime", start.Format(time.RFC3339))
-	q.Add("endTime", end.Format(time.RFC3339))
+	q.Add("StartTime", start.Format(time.DateTime))
+	q.Add("EndTime", end.Format(time.DateTime))
 	r.URL.RawQuery = q.Encode()
 	return c.setFormDataParams(r, query)
 }
