@@ -8,7 +8,7 @@ import (
 )
 
 type nhiLogResponse struct {
-	Code    int    `json:"code"`
+	Code    string `json:"code"`
 	Message string `json:"message"`
 	Data    struct {
 		Metrics []Metric `json:"metrics"`

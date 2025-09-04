@@ -160,7 +160,7 @@ func (t *Type) ValidateExpr(expr string) error {
 		defer resp.Body.Close()
 		if resp.StatusCode == http.StatusOK {
 			r := &struct {
-				Code    int    `json:"code"`
+				Code    string `json:"code"`
 				Message string `json:"message"`
 				Data    struct {
 					Valid        bool   `json:"valid"`
