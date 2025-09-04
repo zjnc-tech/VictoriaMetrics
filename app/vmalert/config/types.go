@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"strings"
@@ -159,17 +160,25 @@ func (t *Type) ValidateExpr(expr string) error {
 		defer resp.Body.Close()
 		if resp.StatusCode == http.StatusOK {
 			r := &struct {
-				Valid        bool   `json:"valid"`
-				ErrorMessage string `json:"errorMessage"`
+				Code    int    `json:"code"`
+				Message string `json:"message"`
+				Data    struct {
+					Valid        bool   `json:"valid"`
+					ErrorMessage string `json:"errorMessage"`
+				} `json:"data"`
 			}{}
 			if err := json.NewDecoder(resp.Body).Decode(r); err != nil {
 				return fmt.Errorf("error parsing nhi_log validate response: %w", err)
 			}
-			if !r.Valid {
-				return fmt.Errorf("bad nhi_log expr: %q, err: %s", expr, r.ErrorMessage)
+			if !r.Data.Valid {
+				return fmt.Errorf("bad nhi_log expr: %q, err: %s", expr, r.Data.ErrorMessage)
 			}
 		} else {
-			return fmt.Errorf("bad nhi_log expr: %q", expr)
+			bodyBytes, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return fmt.Errorf("bad nhi_log expr: %q, err: failed to read response body: %w", expr, err)
+			}
+			return fmt.Errorf("bad nhi_log expr: %q, err: %s", expr, string(bodyBytes))
 		}
 	default:
 		return fmt.Errorf("unknown datasource type=%q", t.Name)

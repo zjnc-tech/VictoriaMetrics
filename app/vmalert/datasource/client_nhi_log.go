@@ -8,7 +8,11 @@ import (
 )
 
 type nhiLogResponse struct {
-	Metrics []Metric `json:"metrics"`
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Data    struct {
+		Metrics []Metric `json:"metrics"`
+	} `json:"data"`
 }
 
 func parseNhiLogResponse(req *http.Request, resp *http.Response) (Result, error) {
@@ -16,7 +20,7 @@ func parseNhiLogResponse(req *http.Request, resp *http.Response) (Result, error)
 	if err := json.NewDecoder(resp.Body).Decode(r); err != nil {
 		return Result{}, fmt.Errorf("error parsing sql metrics for %s: %w", req.URL.Redacted(), err)
 	}
-	return Result{Data: r.Metrics}, nil
+	return Result{Data: r.Data.Metrics}, nil
 }
 
 func (c *Client) setNhiLogReqParams(r *http.Request, query string, timestamp time.Time) error {
