@@ -28,6 +28,7 @@ func parseNhiLogResponse(req *http.Request, resp *http.Response) (Result, error)
 		return Result{}, fmt.Errorf("error parsing sql metrics for %s: %w", req.URL.Redacted(), err)
 	}
 	var metrics []Metric
+	beijingLocation, _ := time.LoadLocation("Asia/Shanghai")
 	for _, metric := range r.Data.Metrics {
 		var m Metric
 		for k, v := range metric.AggregationInfo {
@@ -41,11 +42,12 @@ func parseNhiLogResponse(req *http.Request, resp *http.Response) (Result, error)
 			m.Values = append(m.Values, valueFloat)
 		}
 		for _, timestamp := range metric.AggregationTs {
-			timestamp, err := time.Parse(time.DateTime, timestamp)
+			parsedTime, err := time.ParseInLocation(time.DateTime, timestamp, beijingLocation)
 			if err != nil {
 				return Result{}, fmt.Errorf("error parsing timestamp %s: %w", timestamp, err)
 			}
-			m.Timestamps = append(m.Timestamps, timestamp.UnixMilli())
+			fmt.Printf("responseTime: %s, parsedTime: %s, timestamp: %d\n", timestamp, parsedTime, parsedTime.UnixMilli())
+			m.Timestamps = append(m.Timestamps, parsedTime.UnixMilli())
 		}
 		metrics = append(metrics, m)
 	}
@@ -57,11 +59,12 @@ func (c *Client) setNhiLogReqParams(r *http.Request, query string, timestamp tim
 		r.URL.Path += "/backends/api/v1/log/stats_query"
 	}
 	q := r.URL.Query()
+	beijingLocation, _ := time.LoadLocation("Asia/Shanghai")
 	if c.applyIntervalAsTimeFilter && c.evaluationInterval > 0 {
-		q.Set("StartTime", timestamp.Add(-c.evaluationInterval).Local().Format(time.DateTime))
-		q.Set("EndTime", timestamp.Local().Format(time.DateTime))
+		q.Set("StartTime", timestamp.Add(-c.evaluationInterval).In(beijingLocation).Format(time.DateTime))
+		q.Set("EndTime", timestamp.In(beijingLocation).Format(time.DateTime))
 	} else {
-		q.Set("Time", timestamp.Local().Format(time.DateTime))
+		q.Set("Time", timestamp.In(beijingLocation).Format(time.DateTime))
 	}
 	r.URL.RawQuery = q.Encode()
 	return c.setFormDataParams(r, query)
@@ -72,8 +75,9 @@ func (c *Client) setNhiLogRangeReqParams(r *http.Request, query string, start, e
 		r.URL.Path += "/backends/api/v1/log/stats_query_range"
 	}
 	q := r.URL.Query()
-	q.Add("StartTime", start.Local().Format(time.DateTime))
-	q.Add("EndTime", end.Local().Format(time.DateTime))
+	beijingLocation, _ := time.LoadLocation("Asia/Shanghai")
+	q.Add("StartTime", start.In(beijingLocation).Format(time.DateTime))
+	q.Add("EndTime", end.In(beijingLocation).Format(time.DateTime))
 	r.URL.RawQuery = q.Encode()
 	return c.setFormDataParams(r, query)
 }
