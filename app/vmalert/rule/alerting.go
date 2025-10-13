@@ -470,7 +470,7 @@ func (ar *AlertingRule) exec(ctx context.Context, ts time.Time, limit int) ([]pr
 			a.KeepFiringSince = time.Time{}
 			continue
 		}
-		a := ar.newAlert(m, ts, labels.processed, annotations)
+		a := ar.newAlert(m, time.Unix(m.Timestamps[0], 0), labels.processed, annotations)
 		a.ID = alertID
 		a.State = notifier.StatePending
 		ar.alerts[alertID] = a

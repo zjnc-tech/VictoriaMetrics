@@ -46,8 +46,8 @@ func parseNhiLogResponse(req *http.Request, resp *http.Response) (Result, error)
 			if err != nil {
 				return Result{}, fmt.Errorf("error parsing timestamp %s: %w", timestamp, err)
 			}
-			fmt.Printf("responseTime: %s, parsedTime: %s, timestamp: %d\n", timestamp, parsedTime, parsedTime.UnixMilli())
-			m.Timestamps = append(m.Timestamps, parsedTime.UnixMilli())
+			fmt.Printf("responseTime: %s, parsedTime: %s, timestamp: %d\n", timestamp, parsedTime, parsedTime.Unix())
+			m.Timestamps = append(m.Timestamps, parsedTime.Unix())
 		}
 		metrics = append(metrics, m)
 	}
