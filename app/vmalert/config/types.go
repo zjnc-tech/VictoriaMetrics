@@ -150,7 +150,7 @@ func (t *Type) ValidateExpr(expr string) error {
 			return fmt.Errorf("bad nhi_log http request: %q, err: %w", expr, err)
 		}
 		if !*datasource.DisablePathAppend {
-			r.URL.Path += "/backends/api/v1/log/alert_query_verify"
+			r.URL.Path += "/backends/api/v1/logs/alerts/verify"
 		}
 		r.Header.Set("Content-Type", writer.FormDataContentType())
 		resp, err := http.DefaultClient.Do(r)
