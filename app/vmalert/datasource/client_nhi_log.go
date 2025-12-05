@@ -52,10 +52,10 @@ func (c *Client) setNhiLogReqParams(r *http.Request, query string, timestamp tim
 	}
 	q := r.URL.Query()
 	if c.applyIntervalAsTimeFilter && c.evaluationInterval > 0 {
-		q.Set("StartTime", strconv.FormatInt(timestamp.Add(-c.evaluationInterval).Unix(), 10))
-		q.Set("EndTime", strconv.FormatInt(timestamp.Unix(), 10))
+		q.Set("startTime", strconv.FormatInt(timestamp.Add(-c.evaluationInterval).Unix(), 10))
+		q.Set("endTime", strconv.FormatInt(timestamp.Unix(), 10))
 	} else {
-		q.Set("Time", strconv.FormatInt(timestamp.Unix(), 10))
+		q.Set("time", strconv.FormatInt(timestamp.Unix(), 10))
 	}
 	r.URL.RawQuery = q.Encode()
 	return c.setFormDataParams(r, query)
@@ -66,8 +66,8 @@ func (c *Client) setNhiLogRangeReqParams(r *http.Request, query string, start, e
 		r.URL.Path += "/backends/api/v1/logs/query/stats/range"
 	}
 	q := r.URL.Query()
-	q.Add("StartTime", strconv.FormatInt(start.Unix(), 10))
-	q.Add("EndTime", strconv.FormatInt(end.Unix(), 10))
+	q.Add("startTime", strconv.FormatInt(start.Unix(), 10))
+	q.Add("endTime", strconv.FormatInt(end.Unix(), 10))
 	r.URL.RawQuery = q.Encode()
 	return c.setFormDataParams(r, query)
 }
