@@ -59,12 +59,14 @@ var (
 
 	nhiLogAddr = flag.String("datasource.nhiLogUrl", "", "Datasource compatible with Prometheus HTTP API. "+
 		"Supports address in the form of IP address with a port (e.g., http://127.0.0.1:8428) or DNS SRV record. ")
+	nhiOdeGinAddr = flag.String("datasource.nhiOdeGinUrl", "", "nhi ode gin server url")
 )
 
 var (
 	Addr             = addr
 	AppendTypePrefix = appendTypePrefix
 	NhiLogAddr       = nhiLogAddr
+	NhiOdeGinAddr    = nhiOdeGinAddr
 )
 
 // InitSecretFlags must be called after flag.Parse and before any logging
@@ -93,6 +95,11 @@ func Init(extraParams url.Values) (QuerierBuilder, error) {
 	}
 	if err := httputil.CheckURL(*nhiLogAddr); err != nil {
 		return nil, fmt.Errorf("invalid -datasource.nhiLogUrl: %w", err)
+	}
+	if *nhiOdeGinAddr != "" {
+		if err := httputil.CheckURL(*nhiOdeGinAddr); err != nil {
+			return nil, fmt.Errorf("invalid -datasource.nhiOdeGinUrl: %w", err)
+		}
 	}
 	tr, err := promauth.NewTLSTransport(*tlsCertFile, *tlsKeyFile, *tlsCAFile, *tlsServerName, *tlsInsecureSkipVerify, "vmalert_datasource")
 	if err != nil {
@@ -134,6 +141,7 @@ func Init(extraParams url.Values) (QuerierBuilder, error) {
 		authCfg:          authCfg,
 		datasourceURL:    strings.TrimSuffix(*addr, "/"),
 		nhiLogURL:        strings.TrimSuffix(*nhiLogAddr, "/"),
+		nhiOdeGinAddr:    strings.TrimSuffix(*nhiOdeGinAddr, "/"),
 		appendTypePrefix: *appendTypePrefix,
 		queryStep:        *queryStep,
 		extraParams:      extraParams,

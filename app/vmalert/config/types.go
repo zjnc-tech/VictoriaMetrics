@@ -102,8 +102,12 @@ func (t *Type) ValidateExpr(expr string) error {
 			}
 		}
 	case "sql":
-		r, err := http.NewRequest(http.MethodPost, *datasource.Addr, nil)
-		if *datasource.AppendTypePrefix {
+		sqlAddr := *datasource.Addr
+		if *datasource.NhiOdeGinAddr != "" {
+			sqlAddr = *datasource.NhiOdeGinAddr
+		}
+		r, err := http.NewRequest(http.MethodPost, sqlAddr, nil)
+		if *datasource.AppendTypePrefix && *datasource.NhiOdeGinAddr == "" {
 			r.URL.Path += "/sql"
 		}
 		if !*datasource.DisablePathAppend {

@@ -53,6 +53,7 @@ type Client struct {
 	authCfg          *promauth.Config
 	datasourceURL    string
 	nhiLogURL        string
+	nhiOdeGinAddr    string
 	appendTypePrefix bool
 	queryStep        time.Duration
 	dataSourceType   datasourceType
@@ -86,6 +87,7 @@ func (c *Client) Clone() *Client {
 		authCfg:          c.authCfg,
 		datasourceURL:    c.datasourceURL,
 		nhiLogURL:        c.nhiLogURL,
+		nhiOdeGinAddr:    c.nhiOdeGinAddr,
 		appendTypePrefix: c.appendTypePrefix,
 		queryStep:        c.queryStep,
 
@@ -338,6 +340,12 @@ func (c *Client) newRequest(ctx context.Context) (*http.Request, error) {
 		req, err = http.NewRequestWithContext(ctx, http.MethodPost, c.nhiLogURL, nil)
 		if err != nil {
 			logger.Panicf("BUG: unexpected error from http.NewRequest(%q): %s", c.nhiLogURL, err)
+		}
+	}
+	if c.dataSourceType == datasourceSql && c.nhiOdeGinAddr != "" {
+		req, err = http.NewRequestWithContext(ctx, http.MethodPost, c.nhiOdeGinAddr, nil)
+		if err != nil {
+			logger.Panicf("BUG: unexpected error from http.NewRequest(%q): %s", c.nhiOdeGinAddr, err)
 		}
 	}
 	req.Header.Set("Content-Type", "application/json")
