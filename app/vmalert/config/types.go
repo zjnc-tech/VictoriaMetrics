@@ -1,9 +1,15 @@
 package config
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
+	"mime/multipart"
+	"net/http"
 	"strings"
 
+	"github.com/VictoriaMetrics/VictoriaMetrics/app/vmalert/datasource"
 	"github.com/VictoriaMetrics/VictoriaMetrics/app/vmselect/graphiteql"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/logstorage"
 	"github.com/VictoriaMetrics/metricsql"
@@ -32,6 +38,18 @@ func NewGraphiteType() Type {
 func NewVLogsType() Type {
 	return Type{
 		Name: "vlogs",
+	}
+}
+
+func NewSqlType() Type {
+	return Type{
+		Name: "sql",
+	}
+}
+
+func NewNhiLogType() Type {
+	return Type{
+		Name: "nhi_log",
 	}
 }
 
@@ -83,6 +101,89 @@ func (t *Type) ValidateExpr(expr string) error {
 				return fmt.Errorf("bad LogsQL expr: %q, err: cannot contain time buckets stats pipe `stats by (_time:step)`", expr)
 			}
 		}
+	case "sql":
+		sqlAddr := *datasource.Addr
+		if *datasource.NhiOdeGinAddr != "" {
+			sqlAddr = *datasource.NhiOdeGinAddr
+		}
+		r, err := http.NewRequest(http.MethodPost, sqlAddr, nil)
+		if *datasource.AppendTypePrefix && *datasource.NhiOdeGinAddr == "" {
+			r.URL.Path += "/sql"
+		}
+		if !*datasource.DisablePathAppend {
+			r.URL.Path += "/api/v1/sql_validate"
+		}
+		if err != nil {
+			return fmt.Errorf("bad sql http request: %q, err: %w", expr, err)
+		}
+		params := r.URL.Query()
+		params.Set("query", expr)
+		r.URL.RawQuery = params.Encode()
+		resp, err := http.DefaultClient.Do(r)
+		if err != nil {
+			return fmt.Errorf("bad sql http client: %q, err: %w", expr, err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			r := &struct {
+				Message string `json:"message"`
+			}{}
+			if err := json.NewDecoder(resp.Body).Decode(r); err != nil {
+				return fmt.Errorf("error parsing sql validate response: %w", err)
+			}
+			return fmt.Errorf("bad sql expr: %q, err: %s", expr, r.Message)
+		}
+	case "nhi_log":
+		var body bytes.Buffer
+		writer := multipart.NewWriter(&body)
+		fieldWriter, err := writer.CreateFormField("query")
+		if err != nil {
+			return fmt.Errorf("failed to create form field: %w", err)
+		}
+		_, err = fieldWriter.Write([]byte(expr))
+		if err != nil {
+			return fmt.Errorf("failed to write query to form: %w", err)
+		}
+		err = writer.Close()
+		if err != nil {
+			return fmt.Errorf("failed to close multipart writer: %w", err)
+		}
+
+		r, err := http.NewRequest(http.MethodPost, *datasource.NhiLogAddr, &body)
+		if err != nil {
+			return fmt.Errorf("bad nhi_log http request: %q, err: %w", expr, err)
+		}
+		if !*datasource.DisablePathAppend {
+			r.URL.Path += "/backends/api/v1/logs/alerts/verify"
+		}
+		r.Header.Set("Content-Type", writer.FormDataContentType())
+		resp, err := http.DefaultClient.Do(r)
+		if err != nil {
+			return fmt.Errorf("bad nhi_log http client: %q, err: %w", expr, err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode == http.StatusOK {
+			r := &struct {
+				Code    string `json:"code"`
+				Message string `json:"message"`
+				Data    struct {
+					Valid        bool   `json:"valid"`
+					ErrorMessage string `json:"errorMessage"`
+				} `json:"data"`
+			}{}
+			if err := json.NewDecoder(resp.Body).Decode(r); err != nil {
+				return fmt.Errorf("error parsing nhi_log validate response: %w", err)
+			}
+			if !r.Data.Valid {
+				return fmt.Errorf("bad nhi_log expr: %q, err: %s", expr, r.Data.ErrorMessage)
+			}
+		} else {
+			bodyBytes, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return fmt.Errorf("bad nhi_log expr: %q, err: failed to read response body: %w", expr, err)
+			}
+			return fmt.Errorf("bad nhi_log expr: %q, err: %s", expr, string(bodyBytes))
+		}
 	default:
 		return fmt.Errorf("unknown datasource type=%q", t.Name)
 	}
@@ -96,7 +197,7 @@ func (t *Type) UnmarshalYAML(unmarshal func(any) error) error {
 		return err
 	}
 	switch s {
-	case "graphite", "prometheus", "vlogs":
+	case "graphite", "prometheus", "vlogs", "sql", "nhi_log":
 	default:
 		return fmt.Errorf("unknown datasource type=%q, want prometheus, graphite or vlogs", s)
 	}

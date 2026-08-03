@@ -1,0 +1,29 @@
+# rules.yaml
+groups:
+  # 应用监控告警组
+  - name: application_alerts
+    type: sql
+    interval: 30s
+    rules:
+      - alert: HighHTTPErrorRate
+        expr: "type = mysql | sql = select * from insight_message_dev.channel where cluster = 'nanhu_gpu3_test' and id > 3 | value = id | time = gmt_created | value > 5 | time:100d | label(user=creator, deleted=deleted)"
+        for: 2m
+        labels:
+          severity: critical
+          team: app
+        annotations:
+          summary: "高 HTTP 错误率"
+          description: "HTTP 5xx 错误率超过 5% 已持续 2 分钟"
+      - alert: CPURate
+        expr: "type = clickhouse | sql = select * from graphite.nic_mst_distribute where cluster = 'tianqing_test' and rate > 68 | value = rate | time = timestamp | value > 1 | time:1y1m | label(key=node)"
+        for: 2m
+        labels:
+          severity: critical
+          team: app
+        annotations:
+          summary: "CPU使用率告警"
+          description: "CPU使用率超过 1% 已持续 2 分钟"
+      - record: api:request:rate
+        expr: "type = clickhouse | sql = select * from graphite.nic_mst_distribute where cluster = 'tianqing_test' and rate > 68 | value = rate | time = timestamp | value > 1 | time:1y1m | label(key=node)"
+        labels:
+          type: "rate"

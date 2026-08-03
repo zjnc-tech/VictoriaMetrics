@@ -288,6 +288,9 @@ func (rr *RecordingRule) updateWith(r Rule) error {
 
 // setIntervalAsTimeFilter returns true if given LogsQL has a time filter.
 func setIntervalAsTimeFilter(dType, expr string) bool {
+	if dType == "nhi_log" {
+		return true
+	}
 	if dType != "vlogs" {
 		return false
 	}

@@ -23,6 +23,10 @@ var (
 		"It is not recommended to enable this flag if you use vmalert with VictoriaMetrics.")
 )
 
+var (
+	DisablePathAppend = disablePathAppend
+)
+
 type promResponse struct {
 	Status    string `json:"status"`
 	ErrorType string `json:"errorType"`
